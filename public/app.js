@@ -65,8 +65,8 @@ $("#magic-btn").addEventListener("click", async () => {
 $("#logout-btn").addEventListener("click", () => sb.auth.signOut());
 $("#pass-btn").addEventListener("click", () => {
   openDialog(`<h3>Changer le mot de passe</h3>
-    <label>Nouveau mot de passe (12 caractères min.)<input type="password" name="p1" minlength="12" required autocomplete="new-password"></label>
-    <label>Confirmer<input type="password" name="p2" minlength="12" required autocomplete="new-password"></label>`,
+    <label>Nouveau mot de passe (6 caractères min., ex. 6 chiffres)<input type="password" name="p1" minlength="6" inputmode="text" required autocomplete="new-password"></label>
+    <label>Confirmer<input type="password" name="p2" minlength="6" inputmode="text" required autocomplete="new-password"></label>`,
     async (f) => {
       if (f.p1.value !== f.p2.value) { toast("Les deux saisies diffèrent"); return false; }
       const { error } = await sb.auth.updateUser({ password: f.p1.value });
