@@ -7,7 +7,7 @@ const secret = process.env.SEED_SECRET;
 const url = process.env.SUPABASE_URL;
 if (!secret || !url) { console.log("seed: ignoré (pas de SEED_SECRET)"); process.exit(0); }
 
-const types = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", pdf: "application/pdf" };
+const types = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
 let ok = 0, fail = 0;
 for (const { file, path } of manifest) {
   const local = `seed/${file}`;
