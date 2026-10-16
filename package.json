@@ -1,0 +1,9 @@
+{
+  "name": "plh-sante-dentiste",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/seed-storage.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

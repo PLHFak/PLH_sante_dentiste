@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Dossier dentaire PLH</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path fill='%230f6e6a' d='M20 6c-9 0-14 7-14 16 0 10 5 14 7 26 1 7 3 10 6 10 4 0 4-8 6-14 1-4 3-6 7-6s6 2 7 6c2 6 2 14 6 14 3 0 5-3 6-10 2-12 7-16 7-26 0-9-5-16-14-16-6 0-8 3-12 3s-6-3-12-3z'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Connexion -->
+<section id="login" class="login hidden">
+  <div class="login-card">
+    <div class="login-mark">⟡</div>
+    <h1>Dossier dentaire</h1>
+    <p class="muted">Accès réservé. Connectez-vous avec votre adresse e-mail.</p>
+    <form id="login-form">
+      <label>E-mail<input type="email" id="login-email" required autocomplete="username"></label>
+      <label>Mot de passe<input type="password" id="login-pass" autocomplete="current-password"></label>
+      <button class="btn primary" type="submit">Se connecter</button>
+      <button class="btn ghost" type="button" id="magic-btn">Recevoir un lien par e-mail</button>
+      <p id="login-msg" class="msg"></p>
+    </form>
+  </div>
+</section>
+
+<!-- Application -->
+<div id="app" class="hidden">
+  <header class="patient">
+    <div class="patient-id">
+      <div class="file-tab">DOSSIER N° PLH-DENT</div>
+      <h1>Pierre L'Hoest</h1>
+      <div class="patient-meta">Né le 08/05/1958 · Numérotation FDI · <span id="live" class="live off">● hors ligne</span></div>
+    </div>
+    <div class="patient-next" id="next-rdv"></div>
+    <div class="patient-actions">
+      <button class="btn ghost small" id="print-btn" title="Résumé imprimable pour le dentiste">Résumé dentiste</button>
+      <button class="btn ghost small" id="pass-btn">Mot de passe</button>
+      <button class="btn ghost small" id="logout-btn">Déconnexion</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="synthese" class="active">Synthèse</button>
+    <button data-tab="dents">Dents</button>
+    <button data-tab="chrono">Chronologie</button>
+    <button data-tab="docs">Radios &amp; documents</button>
+    <button data-tab="questions">À clarifier <span class="pill" id="q-count"></span></button>
+    <button data-tab="journal">Journal</button>
+  </nav>
+
+  <main>
+    <!-- Synthèse -->
+    <section id="tab-synthese" class="tab active">
+      <div class="disclaimer">Lecture non médicale des radios, mails et factures. Les éléments « À confirmer » doivent être validés par un dentiste.</div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Alertes en cours</h2>
+          <div id="alerts"></div>
+        </div>
+        <div class="card">
+          <h2>Questions ouvertes</h2>
+          <div id="open-q"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Schéma dentaire</h2><span class="muted small">Cliquez une dent pour sa fiche</span></div>
+        <div class="odonto-wrap"><div id="odonto-mini"></div></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h2>Derniers événements</h2><div id="recent"></div></div>
+        <div class="card"><h2>Pièces manquantes</h2><div id="missing"></div></div>
+      </div>
+    </section>
+
+    <!-- Dents -->
+    <section id="tab-dents" class="tab">
+      <div class="card">
+        <div class="card-head">
+          <h2>Schéma dentaire</h2>
+          <span class="muted small">Vue du praticien : la droite du patient est à gauche de l'écran</span>
+        </div>
+        <div class="odonto-wrap"><div id="odonto"></div></div>
+        <div class="legend" id="legend2"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Inventaire</h2>
+          <select id="cat-filter"><option value="">Toutes catégories</option></select>
+        </div>
+        <div class="table-wrap"><table class="tbl" id="teeth-table"></table></div>
+      </div>
+    </section>
+
+    <!-- Chronologie -->
+    <section id="tab-chrono" class="tab">
+      <div class="card">
+        <div class="card-head">
+          <h2>Chronologie</h2>
+          <div class="filters">
+            <input id="chrono-search" placeholder="Rechercher (praticien, acte…)">
+            <select id="chrono-type"><option value="">Tous types</option></select>
+            <input id="chrono-tooth" placeholder="Dent ex. 37" size="7">
+            <button class="btn primary small owner-only" id="add-event-btn">+ Événement</button>
+          </div>
+        </div>
+        <div id="chrono-total" class="muted small"></div>
+        <ol class="timeline" id="timeline"></ol>
+      </div>
+    </section>
+
+    <!-- Documents -->
+    <section id="tab-docs" class="tab">
+      <div class="card owner-only">
+        <h2>Ajouter des documents</h2>
+        <div class="dropzone" id="dropzone">
+          <p><strong>Glissez ici</strong> radios, factures, devis… ou <label class="link">choisissez<input type="file" id="file-input" multiple hidden></label></p>
+          <div class="drop-fields">
+            <select id="up-type"><option>Radio</option><option>Facture</option><option>Devis</option><option>Ordonnance</option><option>Courrier</option><option>Autre</option></select>
+            <input id="up-date" type="date">
+            <input id="up-teeth" placeholder="Dents (ex. 36,37)">
+            <input id="up-content" placeholder="Description">
+          </div>
+          <div id="up-status" class="msg"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Radios</h2></div>
+        <div class="doc-grid" id="radios"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Factures, devis, ordonnances</h2></div>
+        <div class="table-wrap"><table class="tbl" id="docs-table"></table></div>
+      </div>
+    </section>
+
+    <!-- Questions -->
+    <section id="tab-questions" class="tab">
+      <div class="card">
+        <div class="card-head"><h2>Points à clarifier</h2><button class="btn primary small owner-only" id="add-q-btn">+ Question</button></div>
+        <div id="questions"></div>
+      </div>
+    </section>
+
+    <!-- Journal -->
+    <section id="tab-journal" class="tab">
+      <div class="card owner-only">
+        <h2>Nouvelle note</h2>
+        <form id="note-form" class="note-form">
+          <textarea id="note-body" rows="3" placeholder="Symptôme, décision, ce que le dentiste a dit…" required></textarea>
+          <div class="row"><input id="note-fdi" placeholder="Dent (facultatif)" size="10"><button class="btn primary small">Ajouter</button></div>
+        </form>
+      </div>
+      <div class="card"><h2>Journal</h2><div id="notes"></div></div>
+    </section>
+  </main>
+</div>
+
+<!-- Fiche dent -->
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-inner" id="drawer-inner"></div>
+</aside>
+<div id="scrim" class="scrim"></div>
+
+<!-- Visionneuse radio -->
+<div id="viewer" class="viewer hidden">
+  <div class="viewer-bar">
+    <span id="viewer-title"></span>
+    <div class="viewer-ctrl">
+      <label>Luminosité <input type="range" id="v-bright" min="50" max="200" value="100"></label>
+      <label>Contraste <input type="range" id="v-contrast" min="50" max="250" value="100"></label>
+      <label class="chk"><input type="checkbox" id="v-invert"> Inverser</label>
+      <button class="btn ghost small" id="v-reset">Réinitialiser</button>
+      <a class="btn ghost small" id="v-open" target="_blank" rel="noopener">Ouvrir l'original</a>
+      <button class="btn small" id="v-close">Fermer ✕</button>
+    </div>
+  </div>
+  <div class="viewer-stage" id="viewer-stage"><img id="viewer-img" alt=""></div>
+  <div class="viewer-hint">Molette ou pincement pour zoomer · glisser pour déplacer · double-clic pour revenir</div>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<div id="toast" class="toast"></div>
+<div id="print-area" class="print-only"></div>
+
+<script src="config.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
