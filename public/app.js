@@ -278,7 +278,7 @@ async function loadAll() {
   renderAll();
 }
 async function signUrls() {
-  const paths = S.documents.filter((d) => d.storage_path && !S.urls[d.storage_path]).map((d) => d.storage_path);
+  const paths = S.documents.filter((d) => d.storage_path && !is3D(d) && !S.urls[d.storage_path]).map((d) => d.storage_path);
   if (!paths.length) return;
   const { data } = await sb.storage.from("dossier").createSignedUrls(paths, 3600);
   for (const r of data || []) if (r.signedUrl) S.urls[r.path] = r.signedUrl;
@@ -476,24 +476,30 @@ function editEvent(e = {}) {
 }
 $("#add-event-btn").addEventListener("click", () => editEvent());
 
+const is3D = (d) => d.type === "Imagerie 3D";
 function isImage(d) { return /\.(png|jpe?g|webp|gif)$/i.test(d.storage_path || d.file_name); }
 function docCard(d) {
   if (d.missing) return `<div class="doc-card missing"><div class="doc-thumb">MANQUANT</div><div class="meta"><b>${esc(d.file_name)}</b><span class="muted">${esc(d.content)}</span></div></div>`;
+  if (is3D(d)) return `<div class="doc-card" data-doc="${d.id}"><div class="doc-thumb t3d"><b>3D</b><small>${esc(d.content || "")}</small></div><div class="meta"><b>${esc(fmtDate(d.date_label))} · ${esc(d.file_name)}</b><span class="muted">Ouvrir la visionneuse 3D</span></div></div>`;
   const url = S.urls[d.storage_path];
   const thumb = isImage(d) && url ? `style="background-image:url('${url}')"` : "";
   return `<div class="doc-card" data-doc="${d.id}"><div class="doc-thumb" ${thumb}>${!isImage(d) ? "PDF" : url ? "" : "…"}</div><div class="meta"><b>${esc(fmtDate(d.date_label))} · ${esc(d.type)}</b><span class="muted">${esc(d.content)}</span></div></div>`;
 }
 function bindDocs(root) { $$("[data-doc]", root).forEach((c) => c.addEventListener("click", () => openDoc(S.documents.find((d) => d.id === c.dataset.doc)))); }
 function renderDocs() {
-  const radios = S.documents.filter((d) => /radio/i.test(d.type || "")).sort((a, b) => (a.missing - b.missing) || (b.doc_date || "").localeCompare(a.doc_date || ""));
+  const imgs = S.documents.filter(is3D).sort((a, b) => (b.doc_date || "").localeCompare(a.doc_date || ""));
+  $("#imaging3d").innerHTML = imgs.map(docCard).join("") || `<div class="empty">Aucune imagerie 3D pour l'instant.</div>`;
+  bindDocs($("#imaging3d"));
+  const radios = S.documents.filter((d) => !is3D(d) && /radio/i.test(d.type || "")).sort((a, b) => (a.missing - b.missing) || (b.doc_date || "").localeCompare(a.doc_date || ""));
   $("#radios").innerHTML = radios.map(docCard).join("");
   bindDocs($("#radios"));
-  const others = S.documents.filter((d) => !/radio/i.test(d.type || "")).sort((a, b) => (b.doc_date || "").localeCompare(a.doc_date || ""));
+  const others = S.documents.filter((d) => !is3D(d) && !/radio/i.test(d.type || "")).sort((a, b) => (b.doc_date || "").localeCompare(a.doc_date || ""));
   $("#docs-table").innerHTML = `<thead><tr><th>Date</th><th>Type</th><th>Document</th><th>Contenu</th><th>Dents</th><th></th></tr></thead><tbody>` +
     others.map((d) => `<tr class="${d.missing ? "" : "click"}" ${d.missing ? "" : `data-doc="${d.id}"`}><td>${esc(fmtDate(d.date_label))}</td><td>${esc(d.type)}</td><td>${esc(d.file_name)}</td><td>${esc(d.content)}</td><td>${esc(d.teeth || "")}</td><td>${d.missing ? '<span class="badge b-Alerte">manquant</span>' : "Ouvrir ↗"}</td></tr>`).join("") + "</tbody>";
   bindDocs($("#docs-table"));
 }
 function openDoc(d) {
+  if (is3D(d)) return open3D(d);
   const url = S.urls[d.storage_path];
   if (!url) { toast("Fichier pas encore disponible"); return; }
   if (isImage(d)) openViewer(url, `${fmtDate(d.date_label)} · ${d.content || d.file_name}`);
@@ -619,7 +625,8 @@ function closeTooth() {
 $("#scrim").addEventListener("click", closeTooth);
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!$("#viewer").classList.contains("hidden")) closeViewer(); else closeTooth();
+  if (!$("#v3d").classList.contains("hidden")) close3D();
+  else if (!$("#viewer").classList.contains("hidden")) closeViewer(); else closeTooth();
 });
 
 /* ---------- Visionneuse radio ---------- */
@@ -664,6 +671,97 @@ stage.addEventListener("pointermove", (e) => {
   V.x += e.clientX - V.last.x; V.y += e.clientY - V.last.y; V.last = { x: e.clientX, y: e.clientY }; applyV();
 });
 ["pointerup", "pointercancel"].forEach((ev) => stage.addEventListener(ev, (e) => { V.pts.delete(e.pointerId); V.dist = 0; const p = [...V.pts.values()][0]; if (p) V.last = p; }));
+
+/* ---------- Imagerie 3D (DICOM) ---------- */
+let DWV = null;
+const loadDwv = async () => (DWV ||= await import("./vendor/dwv/dwv.bundle.js"));
+const dcmVal = (el, tag) => { const e = el[tag]; const v = e?.value; return Array.isArray(v) ? String(v[0] ?? "").trim() : (v ?? ""); };
+const dcmDate = (v) => /^\d{8}$/.test(v) ? `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}` : null;
+
+$("#dcm-input").addEventListener("change", async (e) => {
+  const files = [...e.target.files].filter((f) => !/^(DICOMDIR|.*\.(txt|inf|bat|exe|dll|ico|xml|pdf|html?|htm|js|css|ini|cfg|jpg|png|zip))$/i.test(f.name) && f.size > 1000);
+  e.target.value = "";
+  if (!files.length) { $("#dcm-status").textContent = "Aucun fichier DICOM trouvé dans ce dossier."; return; }
+  const st = (t) => ($("#dcm-status").textContent = t);
+  st(`Analyse de ${files.length} fichiers…`);
+  const { DicomParser } = await loadDwv();
+  const series = new Map();
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    try {
+      const p = new DicomParser(); p.parse(await f.arrayBuffer());
+      const el = p.getDicomElements();
+      if (!el["7FE00010"]) continue;
+      const uid = dcmVal(el, "0020000E") || "sans-serie";
+      if (!series.has(uid)) series.set(uid, { uid, files: [], desc: dcmVal(el, "0008103E"), mod: dcmVal(el, "00080060"), date: dcmDate(dcmVal(el, "00080020")), study: dcmVal(el, "00081030") });
+      series.get(uid).files.push(f);
+    } catch { /* fichier non DICOM : ignoré */ }
+    if (i % 25 === 0) st(`Analyse : ${i + 1}/${files.length}…`);
+  }
+  if (!series.size) { st("Aucune image DICOM reconnue."); return; }
+  let done = 0; const total = [...series.values()].reduce((s, x) => s + x.files.length, 0);
+  for (const sr of series.values()) {
+    const id = (sr.date || today).replaceAll("-", "") + "_" + sr.uid.replace(/[^0-9]/g, "").slice(-10);
+    const prefix = `3d/${id}/`;
+    for (let k = 0; k < sr.files.length; k++) {
+      const up = await sb.storage.from("dossier").upload(`${prefix}${String(k).padStart(4, "0")}.dcm`, sr.files[k], { upsert: true, contentType: "application/dicom" });
+      if (up.error) { st("Erreur d'envoi : " + up.error.message); return; }
+      done++; if (done % 5 === 0 || done === total) st(`Envoi : ${done}/${total} images…`);
+    }
+    const name = [sr.mod, sr.desc || sr.study].filter(Boolean).join(" – ") || "Série DICOM";
+    const { error } = await sb.from("documents").upsert({
+      date_label: sr.date || today, doc_date: sr.date || today, file_name: name, storage_path: prefix, type: "Imagerie 3D",
+      content: `${sr.files.length} coupes`, origin: "Ajout imagerie 3D", teeth: null, missing: false,
+    }, { onConflict: "storage_path" });
+    if (error) { st("Erreur : " + error.message); return; }
+  }
+  st(`${series.size} série(s) ajoutée(s) : ${total} images.`);
+});
+
+let V3 = null;
+function v3dLayout(n) {
+  $("#v3d-grid").classList.toggle("one", n === 1);
+}
+async function open3D(d) {
+  $("#v3d").classList.remove("hidden");
+  $("#v3d-title").textContent = `${fmtDate(d.date_label)} · ${d.file_name} · ${d.content || ""}`;
+  $("#v3d-bar").style.width = "2%";
+  const { data: list, error } = await sb.storage.from("dossier").list(d.storage_path.replace(/\/$/, ""), { limit: 2000, sortBy: { column: "name", order: "asc" } });
+  if (error || !list?.length) { toast("Images introuvables"); return close3D(); }
+  const paths = list.filter((o) => o.name.endsWith(".dcm")).map((o) => d.storage_path + o.name);
+  const signed = [];
+  for (let i = 0; i < paths.length; i += 200) {
+    const { data } = await sb.storage.from("dossier").createSignedUrls(paths.slice(i, i + 200), 3600);
+    signed.push(...(data || []).map((r) => r.signedUrl).filter(Boolean));
+  }
+  const { App, AppOptions, ViewConfig, ToolConfig } = await loadDwv();
+  ["v3d-ax", "v3d-co", "v3d-sa"].forEach((id) => ($("#" + id).innerHTML = ""));
+  const one = $("#v3d-layout").value === "1"; v3dLayout(one ? 1 : 3);
+  const mk = (div, o) => { const c = new ViewConfig(div); c.orientation = o; return c; };
+  const configs = one ? [mk("v3d-ax", "axial")] : [mk("v3d-ax", "axial"), mk("v3d-co", "coronal"), mk("v3d-sa", "sagittal")];
+  const opts = new AppOptions({ "*": configs });
+  opts.tools = { Scroll: new ToolConfig(), WindowLevel: new ToolConfig(), ZoomAndPan: new ToolConfig() };
+  V3 = new App(); V3.init(opts);
+  V3.addEventListener("loadprogress", (ev) => { $("#v3d-bar").style.width = Math.max(2, ev.loaded || 0) + "%"; });
+  V3.addEventListener("load", () => { V3.setTool("Scroll"); $$("#v3d [data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === "Scroll")); });
+  V3.addEventListener("loadend", () => { $("#v3d-bar").style.width = "100%"; setTimeout(() => ($("#v3d-bar").style.width = "0"), 600); });
+  V3.addEventListener("error", (ev) => toast("Erreur de lecture : " + (ev.error?.message || "")));
+  V3.loadURLs(signed);
+  V3.current = d;
+}
+function close3D() {
+  try { V3?.reset?.(); } catch {}
+  V3 = null; $("#v3d").classList.add("hidden");
+  ["v3d-ax", "v3d-co", "v3d-sa"].forEach((id) => ($("#" + id).innerHTML = ""));
+}
+$("#v3d-close").addEventListener("click", close3D);
+$$("#v3d [data-tool]").forEach((b) => b.addEventListener("click", () => {
+  if (!V3) return; V3.setTool(b.dataset.tool);
+  $$("#v3d [data-tool]").forEach((x) => x.classList.toggle("on", x === b));
+}));
+$("#v3d-reset").addEventListener("click", () => { try { V3?.resetLayout(); } catch {} });
+$("#v3d-layout").addEventListener("change", () => { const d = V3?.current; if (d) { close3D(); open3D(d); } });
+window.addEventListener("resize", () => { try { V3?.onResize(); } catch {} });
 
 /* ---------- Dialogue générique ---------- */
 function openDialog(html, onSubmit) {

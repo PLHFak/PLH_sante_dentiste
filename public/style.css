@@ -268,6 +268,22 @@ dialog::backdrop{background:rgba(27,36,48,.35)}
 .choice i{grid-row:1/3;grid-column:2;align-self:center;font-style:normal;font-size:20px;color:var(--accent)}
 #signup-form,#login-form{margin-top:4px}
 .ob-alert{background:var(--danger-bg);border:1px solid #efc2bb;border-radius:9px;padding:9px 12px;font-size:14px;margin:0 0 10px}
+/* Imagerie 3D */
+.doc-thumb.t3d{background:radial-gradient(circle at 50% 40%,#2c4a5a,#0d1418);color:#cfe7ef;display:flex;flex-direction:column;gap:2px}
+.doc-thumb.t3d b{font:600 30px var(--mono);letter-spacing:.05em}
+.doc-thumb.t3d small{font-size:12px;opacity:.8}
+.v3d .btn.on{background:#5fb3ac;color:#0b0d10;border-color:#5fb3ac}
+.v3d select{background:#222830;color:#ddd;border-color:#38404a}
+.v3d-progress{height:3px;background:#14181d}
+.v3d-progress div{height:100%;width:0;background:#5fb3ac;transition:width .2s}
+.v3d-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:3px;background:#000;min-height:0}
+.v3d-grid .v3d-pane:first-child{grid-row:1/3}
+.v3d-grid.one{grid-template-columns:1fr;grid-template-rows:1fr}
+.v3d-grid.one .v3d-pane:not(:first-child){display:none}
+.v3d-pane{position:relative;min-height:0;overflow:hidden;background:#000}
+.v3d-pane>span{position:absolute;z-index:2;left:8px;top:6px;font:600 11px var(--mono);color:#8fb;letter-spacing:.08em;text-transform:uppercase;pointer-events:none}
+.layerGroup{width:100%;height:100%;position:relative}
+@media (max-width:700px){.v3d-grid{grid-template-columns:1fr;grid-template-rows:2fr 1fr 1fr}.v3d-grid .v3d-pane:first-child{grid-row:auto}}
 .print-only{display:none}
 @media (max-width:640px){
   .patient h1{font-size:24px}

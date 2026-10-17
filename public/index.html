@@ -212,6 +212,13 @@
         </div>
       </div>
       <div class="card">
+        <div class="card-head"><h2>Imagerie 3D <span class="muted small">scanner, CBCT, IRM (DICOM)</span></h2>
+          <label class="btn primary small owner-only">+ Ajouter une imagerie 3D<input type="file" id="dcm-input" webkitdirectory multiple hidden></label></div>
+        <p class="muted small owner-only">Choisissez le <b>dossier</b> du CD ou du téléchargement (celui qui contient « DICOMDIR » ou « DICOM ») : les séries sont reconnues et classées automatiquement.</p>
+        <div id="dcm-status" class="msg"></div>
+        <div class="doc-grid" id="imaging3d"></div>
+      </div>
+      <div class="card">
         <div class="card-head"><h2>Radios</h2></div>
         <div class="doc-grid" id="radios"></div>
       </div>
@@ -292,6 +299,28 @@
   </div>
   <div class="viewer-stage" id="viewer-stage"><img id="viewer-img" alt=""></div>
   <div class="viewer-hint">Molette ou pincement pour zoomer · glisser pour déplacer · double-clic pour revenir</div>
+</div>
+
+<!-- Visionneuse 3D -->
+<div id="v3d" class="viewer v3d hidden">
+  <div class="viewer-bar">
+    <span id="v3d-title"></span>
+    <div class="viewer-ctrl">
+      <button class="btn small on" data-tool="Scroll" title="Molette ou glisser : changer de coupe">↕ Coupes</button>
+      <button class="btn small" data-tool="WindowLevel" title="Glisser : luminosité / contraste">◐ Contraste</button>
+      <button class="btn small" data-tool="ZoomAndPan" title="Molette : zoom · glisser : déplacer">⤢ Zoom</button>
+      <select id="v3d-layout"><option value="3">3 vues</option><option value="1">1 vue (axiale)</option></select>
+      <button class="btn ghost small" id="v3d-reset">Réinitialiser</button>
+      <button class="btn small" id="v3d-close">Fermer ✕</button>
+    </div>
+  </div>
+  <div class="v3d-progress"><div id="v3d-bar"></div></div>
+  <div class="v3d-grid" id="v3d-grid">
+    <div class="v3d-pane"><span>Axiale</span><div id="v3d-ax" class="layerGroup"></div></div>
+    <div class="v3d-pane"><span>Coronale</span><div id="v3d-co" class="layerGroup"></div></div>
+    <div class="v3d-pane"><span>Sagittale</span><div id="v3d-sa" class="layerGroup"></div></div>
+  </div>
+  <div class="viewer-hint">Coupes : molette ou glisser · Contraste : glisser · Zoom : molette · Sur mobile : un doigt pour l'outil choisi, deux doigts pour zoomer</div>
 </div>
 
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
