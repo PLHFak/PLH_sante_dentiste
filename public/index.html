@@ -22,10 +22,62 @@
     <form id="login-form">
       <label>E-mail<input type="email" id="login-email" required autocomplete="username"></label>
       <label>Mot de passe<input type="password" id="login-pass" autocomplete="current-password"></label>
+      <p class="hint">Première connexion ? Utilisez le mot de passe provisoire reçu : vous choisirez le vôtre juste après.</p>
       <button class="btn primary" type="submit">Se connecter</button>
       <button class="btn ghost" type="button" id="magic-btn">Recevoir un lien par e-mail</button>
       <p id="login-msg" class="msg"></p>
+      <p class="small muted center">Pas encore de compte ? <a href="#" id="show-signup">Demander un accès</a></p>
     </form>
+    <form id="signup-form" class="hidden">
+      <p class="hint">Créez votre compte. Il sera actif dès que Pierre L'Hoest aura validé votre accès.</p>
+      <label>E-mail<input type="email" id="su-email" required autocomplete="username"></label>
+      <label>Mot de passe (6 caractères min.)<input type="password" id="su-pass" minlength="6" required autocomplete="new-password"></label>
+      <label>Confirmer le mot de passe<input type="password" id="su-pass2" minlength="6" required autocomplete="new-password"></label>
+      <button class="btn primary" type="submit">Envoyer ma demande</button>
+      <p id="su-msg" class="msg"></p>
+      <p class="small muted center"><a href="#" id="show-login">← Retour à la connexion</a></p>
+    </form>
+  </div>
+</section>
+
+<!-- Accueil guidé (première connexion) -->
+<section id="onboard" class="onboard hidden" aria-modal="true" role="dialog">
+  <div class="onboard-card">
+    <div class="steps"><span data-s="1" class="on">1. Bienvenue</span><span data-s="2">2. Mot de passe</span><span data-s="3">3. Visite</span></div>
+
+    <div class="ob-step" data-step="1">
+      <h2 class="ob-title">Bienvenue dans votre dossier dentaire</h2>
+      <p>Vous êtes connecté avec un <b>mot de passe provisoire</b>. Première étape : choisir le vôtre. Cela prend 30 secondes.</p>
+      <ul class="ob-list">
+        <li>6 caractères minimum, par exemple 6 chiffres.</li>
+        <li>Évitez votre date de naissance ou 123456.</li>
+        <li>L'œil 👁 permet d'afficher ce que vous tapez.</li>
+      </ul>
+      <div class="ob-actions"><button class="btn primary" data-go="2">Choisir mon mot de passe →</button></div>
+    </div>
+
+    <div class="ob-step hidden" data-step="2">
+      <h2 class="ob-title">Votre nouveau mot de passe</h2>
+      <form id="ob-form">
+        <label>Nouveau mot de passe<input type="password" id="ob-p1" minlength="6" required autocomplete="new-password"></label>
+        <label>Retapez-le<input type="password" id="ob-p2" minlength="6" required autocomplete="new-password"></label>
+        <div id="ob-check" class="ob-check"></div>
+        <div class="ob-actions"><button type="button" class="btn ghost" data-go="1">← Retour</button><button class="btn primary" id="ob-save">Enregistrer</button></div>
+        <p id="ob-msg" class="msg"></p>
+      </form>
+    </div>
+
+    <div class="ob-step hidden" data-step="3">
+      <h2 class="ob-title">C'est fait ✓</h2>
+      <p>Votre mot de passe est enregistré. À la prochaine connexion, utilisez-le avec votre e-mail.</p>
+      <ul class="ob-list">
+        <li><b>Synthèse</b> : alertes, prochain rendez-vous, questions ouvertes.</li>
+        <li><b>Dents</b> : cliquez une dent pour voir sa fiche, ses radios et son historique.</li>
+        <li><b>Radios &amp; documents</b> : visionneuse avec zoom et contraste ; glissez-y de nouveaux fichiers.</li>
+        <li><b>Résumé dentiste</b> : une page imprimable à montrer en consultation.</li>
+      </ul>
+      <div class="ob-actions"><button class="btn primary" id="ob-done">Ouvrir mon dossier</button></div>
+    </div>
   </div>
 </section>
 
@@ -52,6 +104,7 @@
     <button data-tab="docs">Radios &amp; documents</button>
     <button data-tab="questions">À clarifier <span class="pill" id="q-count"></span></button>
     <button data-tab="journal">Journal</button>
+    <button data-tab="admin" id="admin-tab" class="admin-tab hidden">Admin 🔒</button>
   </nav>
 
   <main>
@@ -158,6 +211,34 @@
         </form>
       </div>
       <div class="card"><h2>Journal</h2><div id="notes"></div></div>
+    </section>
+
+    <!-- Admin (propriétaire uniquement) -->
+    <section id="tab-admin" class="tab">
+      <div class="card admin-lock" id="admin-lock">
+        <h2>Espace administrateur</h2>
+        <p class="muted">Entrez le code administrateur pour afficher les visites et les inscriptions.</p>
+        <form id="admin-form" class="row">
+          <input type="password" id="admin-code" placeholder="Code admin" autocomplete="off" size="14">
+          <button class="btn primary small">Ouvrir</button>
+        </form>
+        <p id="admin-msg" class="msg"></p>
+      </div>
+      <div id="admin-body" class="hidden">
+        <div class="stats" id="admin-stats"></div>
+        <div class="card">
+          <div class="card-head"><h2>Comptes et inscriptions</h2><button class="btn ghost small" id="admin-refresh">Actualiser</button></div>
+          <div class="table-wrap"><table class="tbl" id="admin-users"></table></div>
+          <p class="muted small">« Aucun accès » : le compte existe mais ne voit rien. « Lecteur » : consultation seule. « Propriétaire » : peut tout modifier.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Journal des visites et connexions</h2>
+            <select id="admin-filter"><option value="">Tous</option><option value="visit">Visites</option><option value="login">Connexions</option><option value="login_failed">Échecs</option><option value="signup">Inscriptions</option><option value="password_set">Mots de passe</option><option value="admin_open">Accès admin</option></select>
+          </div>
+          <div class="table-wrap"><table class="tbl" id="admin-log"></table></div>
+        </div>
+        <div class="row"><button class="btn ghost small" id="admin-lockbtn">Verrouiller l'admin</button></div>
+      </div>
     </section>
   </main>
 </div>

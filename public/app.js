@@ -37,13 +37,39 @@ function sortedEvents() {
   return [...S.events].sort((a, b) => (b.date_sort || "0000").localeCompare(a.date_sort || "0000") || (b.created_at || "").localeCompare(a.created_at || ""));
 }
 
+/* ---------- Journal d'accès ---------- */
+function logEvent(event, email = null, detail = null) {
+  sb.from("access_log").insert({ event, email: email || S.email || null, detail, user_agent: navigator.userAgent.slice(0, 400) })
+    .then(() => {}, () => {});
+}
+function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { return null; } }
+
+/* ---------- Œil sur les mots de passe ---------- */
+function eyes(root = document) {
+  $$('input[type="password"]', root).forEach((inp) => {
+    if (inp.dataset.eye) return;
+    inp.dataset.eye = "1";
+    const wrap = document.createElement("span"); wrap.className = "pw";
+    inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "eye"; b.title = "Afficher / masquer"; b.setAttribute("aria-label", "Afficher le mot de passe"); b.textContent = "👁";
+    b.addEventListener("click", () => {
+      const show = inp.type === "password"; inp.type = show ? "text" : "password";
+      b.classList.toggle("on", show); b.setAttribute("aria-label", show ? "Masquer le mot de passe" : "Afficher le mot de passe");
+    });
+    wrap.appendChild(b);
+  });
+}
+
 /* ---------- Authentification ---------- */
 async function boot() {
+  eyes();
   if (!SUPABASE_URL || !SUPABASE_KEY) { $("#login").classList.remove("hidden"); $("#login-msg").textContent = "Configuration Supabase manquante (config.js)."; return; }
   const { data: { session } } = await sb.auth.getSession();
+  if (!store("visited")) { store("visited", "1"); logEvent("visit", session?.user?.email, location.pathname + location.hash); }
   if (session) await enter(session); else $("#login").classList.remove("hidden");
   sb.auth.onAuthStateChange((ev, sess) => {
-    if (ev === "SIGNED_IN" && sess && !S.email) enter(sess);
+    if (ev === "SIGNED_IN" && sess && !S.email) { if (location.hash.includes("access_token")) logEvent("magic_link", sess.user.email); enter(sess); }
     if (ev === "SIGNED_OUT") location.reload();
   });
 }
@@ -54,7 +80,10 @@ $("#login-form").addEventListener("submit", async (e) => {
   if (!password) { $("#login-msg").textContent = "Entrez le mot de passe, ou demandez un lien par e-mail."; return; }
   $("#login-msg").textContent = "Connexion…";
   const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) $("#login-msg").textContent = "Échec : " + error.message;
+  if (error) {
+    logEvent("login_failed", email, error.message);
+    $("#login-msg").textContent = /invalid/i.test(error.message) ? "E-mail ou mot de passe incorrect." : "Échec : " + error.message;
+  } else logEvent("login", email);
 });
 $("#magic-btn").addEventListener("click", async () => {
   const email = $("#login-email").value.trim();
@@ -62,14 +91,28 @@ $("#magic-btn").addEventListener("click", async () => {
   const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin, shouldCreateUser: false } });
   $("#login-msg").textContent = error ? "Échec : " + error.message : "Lien envoyé. Ouvrez-le sur cet appareil.";
 });
-$("#logout-btn").addEventListener("click", () => sb.auth.signOut());
+$("#show-signup").addEventListener("click", (e) => { e.preventDefault(); $("#login-form").classList.add("hidden"); $("#signup-form").classList.remove("hidden"); });
+$("#show-login").addEventListener("click", (e) => { e.preventDefault(); $("#signup-form").classList.add("hidden"); $("#login-form").classList.remove("hidden"); });
+$("#signup-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#su-email").value.trim(), p1 = $("#su-pass").value, p2 = $("#su-pass2").value;
+  if (p1 !== p2) { $("#su-msg").textContent = "Les deux mots de passe diffèrent."; return; }
+  $("#su-msg").textContent = "Envoi…";
+  const { error } = await sb.auth.signUp({ email, password: p1, options: { emailRedirectTo: location.origin, data: { password_set: true } } });
+  if (error) { $("#su-msg").textContent = "Échec : " + error.message; return; }
+  logEvent("signup", email);
+  await sb.auth.signOut({ scope: "local" });
+  $("#su-msg").textContent = "Demande enregistrée. Vous pourrez vous connecter dès que votre accès sera validé.";
+});
+$("#logout-btn").addEventListener("click", async () => { logEvent("logout"); store("adm", null); await sb.auth.signOut(); });
 $("#pass-btn").addEventListener("click", () => {
   openDialog(`<h3>Changer le mot de passe</h3>
-    <label>Nouveau mot de passe (6 caractères min., ex. 6 chiffres)<input type="password" name="p1" minlength="6" inputmode="text" required autocomplete="new-password"></label>
-    <label>Confirmer<input type="password" name="p2" minlength="6" inputmode="text" required autocomplete="new-password"></label>`,
+    <label>Nouveau mot de passe (6 caractères min., ex. 6 chiffres)<input type="password" name="p1" minlength="6" required autocomplete="new-password"></label>
+    <label>Confirmer<input type="password" name="p2" minlength="6" required autocomplete="new-password"></label>`,
     async (f) => {
       if (f.p1.value !== f.p2.value) { toast("Les deux saisies diffèrent"); return false; }
-      const { error } = await sb.auth.updateUser({ password: f.p1.value });
+      const { error } = await sb.auth.updateUser({ password: f.p1.value, data: { password_set: true } });
+      if (!error) logEvent("password_set");
       toast(error ? "Erreur : " + error.message : "Mot de passe modifié");
     });
 });
@@ -79,16 +122,109 @@ async function enter(session) {
   const { data: me } = await sb.from("allowed_users").select("role").maybeSingle();
   if (!me) {
     $("#login").classList.remove("hidden");
-    $("#login-msg").textContent = `Le compte ${S.email} n'est pas autorisé.`;
+    $("#login-msg").textContent = `Votre compte ${S.email} est créé mais pas encore autorisé. Pierre L'Hoest doit valider votre accès.`;
+    S.email = null;
     await sb.auth.signOut({ scope: "local" });
     return;
   }
   S.role = me.role;
   document.body.classList.toggle("reader", !isOwner());
+  $("#admin-tab").classList.toggle("hidden", !isOwner());
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
   await loadAll();
   subscribe();
+  if (!session.user.user_metadata?.password_set) showOnboarding();
+  const h = location.hash.slice(1);
+  if (h && $(`#tabs [data-tab="${h}"]`) && !$(`#tabs [data-tab="${h}"]`).classList.contains("hidden")) $(`#tabs [data-tab="${h}"]`).click();
+}
+
+/* ---------- Accueil guidé ---------- */
+function obStep(n) {
+  $$("#onboard .ob-step").forEach((s) => s.classList.toggle("hidden", s.dataset.step !== String(n)));
+  $$("#onboard .steps span").forEach((s) => s.classList.toggle("on", +s.dataset.s <= n));
+  const f = $(`#onboard .ob-step[data-step="${n}"] input`); if (f) setTimeout(() => f.focus(), 50);
+}
+function showOnboarding() { eyes($("#onboard")); $("#onboard").classList.remove("hidden"); obStep(1); }
+$$("#onboard [data-go]").forEach((b) => b.addEventListener("click", () => obStep(+b.dataset.go)));
+function obCheck() {
+  const p1 = $("#ob-p1").value, p2 = $("#ob-p2").value;
+  const ok1 = p1.length >= 6, ok2 = p1 && p1 === p2;
+  $("#ob-check").innerHTML = `<span class="${ok1 ? "ok" : ""}">${ok1 ? "✓" : "○"} 6 caractères minimum</span><span class="${ok2 ? "ok" : ""}">${ok2 ? "✓" : "○"} Les deux saisies sont identiques</span>`;
+  return ok1 && ok2;
+}
+["#ob-p1", "#ob-p2"].forEach((s) => $(s).addEventListener("input", obCheck));
+$("#ob-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!obCheck()) { $("#ob-msg").textContent = "Vérifiez les deux points ci-dessus."; return; }
+  $("#ob-msg").textContent = "Enregistrement…";
+  const { error } = await sb.auth.updateUser({ password: $("#ob-p1").value, data: { password_set: true } });
+  if (error) { $("#ob-msg").textContent = "Erreur : " + error.message; return; }
+  logEvent("password_set");
+  $("#ob-msg").textContent = "";
+  obStep(3);
+});
+$("#ob-done").addEventListener("click", () => $("#onboard").classList.add("hidden"));
+
+/* ---------- Admin ---------- */
+const ADMIN_CODE = "PLH";
+const EV_LABEL = { visit: "Visite", login: "Connexion", login_failed: "Échec de connexion", signup: "Inscription", password_set: "Mot de passe choisi", admin_open: "Ouverture admin", logout: "Déconnexion", magic_link: "Lien e-mail" };
+const A = { users: [], log: [] };
+function adminUnlocked() { return isOwner() && store("adm") === "1"; }
+function showAdmin() {
+  const ok = adminUnlocked();
+  $("#admin-lock").classList.toggle("hidden", ok);
+  $("#admin-body").classList.toggle("hidden", !ok);
+  $("#admin-tab").textContent = ok ? "Admin" : "Admin 🔒";
+  if (ok) loadAdmin(); else { eyes($("#admin-lock")); setTimeout(() => $("#admin-code").focus(), 50); }
+}
+$("#admin-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if ($("#admin-code").value.trim().toUpperCase() === ADMIN_CODE && isOwner()) {
+    store("adm", "1"); $("#admin-code").value = ""; $("#admin-msg").textContent = ""; logEvent("admin_open"); showAdmin();
+  } else $("#admin-msg").textContent = "Code incorrect.";
+});
+$("#admin-lockbtn").addEventListener("click", () => { store("adm", null); showAdmin(); });
+$("#admin-refresh").addEventListener("click", () => loadAdmin());
+$("#admin-filter").addEventListener("change", renderAdmin);
+async function loadAdmin() {
+  if (!adminUnlocked()) return;
+  const [u, l] = await Promise.all([
+    sb.rpc("admin_users"),
+    sb.from("access_log").select("*").order("at", { ascending: false }).limit(500),
+  ]);
+  if (u.error) toast("Admin : " + u.error.message);
+  A.users = u.data || []; A.log = l.data || [];
+  renderAdmin();
+}
+function dt(s) { return s ? new Date(s).toLocaleString("fr-BE", { dateStyle: "short", timeStyle: "short" }) : "—"; }
+function renderAdmin() {
+  const since = (d) => Date.now() - d * 864e5;
+  const cnt = (ev, d) => A.log.filter((r) => r.event === ev && new Date(r.at) >= since(d)).length;
+  const pending = A.users.filter((u) => !u.role).length;
+  $("#admin-stats").innerHTML = [
+    ["Visites (7 j)", cnt("visit", 7)], ["Connexions (7 j)", cnt("login", 7) + cnt("magic_link", 7)],
+    ["Échecs (7 j)", cnt("login_failed", 7)], ["Comptes", A.users.length], ["En attente", pending],
+  ].map(([l, v]) => `<div class="stat ${l === "En attente" && v ? "warn" : ""}${l.startsWith("Échecs") && v ? " bad" : ""}"><b>${v}</b><span>${l}</span></div>`).join("");
+  $("#admin-users").innerHTML = `<thead><tr><th>E-mail</th><th>Inscrit le</th><th>Dernière connexion</th><th>Mot de passe</th><th>Accès</th></tr></thead><tbody>` +
+    A.users.map((u) => {
+      const self = u.email?.toLowerCase() === S.email?.toLowerCase();
+      return `<tr><td>${esc(u.email)}${u.confirmed ? "" : ' <span class="badge b-Obturée">non confirmé</span>'}</td><td>${dt(u.created_at)}</td><td>${dt(u.last_sign_in_at)}</td><td>${u.password_set ? "choisi" : '<span class="muted">provisoire</span>'}</td>
+      <td>${self ? '<span class="badge b-Implant">Propriétaire (vous)</span>' : `<select data-acc="${esc(u.email)}"><option value="" ${!u.role ? "selected" : ""}>Aucun accès</option><option value="reader" ${u.role === "reader" ? "selected" : ""}>Lecteur</option><option value="owner" ${u.role === "owner" ? "selected" : ""}>Propriétaire</option></select>`}</td></tr>`;
+    }).join("") + "</tbody>";
+  $$("[data-acc]").forEach((s) => s.addEventListener("change", async () => {
+    const { error } = await sb.rpc("admin_set_access", { p_email: s.dataset.acc, p_role: s.value || null });
+    toast(error ? "Erreur : " + error.message : "Accès mis à jour"); loadAdmin();
+  }));
+  const f = $("#admin-filter").value;
+  const rows = A.log.filter((r) => !f || r.event === f || (f === "login" && r.event === "magic_link"));
+  $("#admin-log").innerHTML = `<thead><tr><th>Date</th><th>Événement</th><th>E-mail</th><th>Appareil</th><th>Détail</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr class="ev-${esc(r.event)}"><td>${dt(r.at)}</td><td>${esc(EV_LABEL[r.event] || r.event)}</td><td>${esc(r.email || "anonyme")}</td><td class="small muted">${esc(device(r.user_agent))}</td><td class="small">${esc(r.detail || "")}</td></tr>`).join("") + "</tbody>";
+}
+function device(ua = "") {
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac OS/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "?";
+  const br = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "";
+  return `${os} ${br}`.trim();
 }
 
 /* ---------- Données ---------- */
@@ -119,6 +255,7 @@ function subscribe() {
       toast("Dossier mis à jour");
     });
   }
+  if (isOwner()) ch.on("postgres_changes", { event: "INSERT", schema: "public", table: "access_log" }, () => { if (adminUnlocked()) loadAdmin(); });
   ch.subscribe((status) => {
     const live = $("#live");
     const on = status === "SUBSCRIBED";
@@ -500,6 +637,7 @@ function openDialog(html, onSubmit) {
     const res = await onSubmit(form);
     if (res !== false) dlg.close();
   };
+  eyes(form);
   dlg.showModal();
 }
 
@@ -508,9 +646,8 @@ $$("#tabs button").forEach((b) => b.addEventListener("click", () => {
   $$("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
   $$(".tab").forEach((t) => t.classList.toggle("active", t.id === "tab-" + b.dataset.tab));
   history.replaceState(null, "", "#" + b.dataset.tab);
+  if (b.dataset.tab === "admin") showAdmin();
 }));
-const h = location.hash.slice(1);
-if (h && $(`#tabs [data-tab="${h}"]`)) $(`#tabs [data-tab="${h}"]`).click();
 
 /* ---------- Résumé imprimable ---------- */
 $("#print-btn").addEventListener("click", () => {

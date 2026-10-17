@@ -207,6 +207,46 @@ dialog::backdrop{background:rgba(27,36,48,.35)}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .reader .owner-only{display:none!important}
 
+/* Mot de passe + œil */
+.pw{position:relative;display:block}
+.pw input{width:100%;padding-right:40px}
+.row .pw{display:inline-block}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;opacity:.45;line-height:1}
+.eye:hover{opacity:.8;background:var(--paper)}
+.eye.on{opacity:1}
+.hint{font-size:12.5px;color:var(--ink-2);background:var(--accent-2);border:1px solid #c6e0dc;border-radius:8px;padding:7px 10px;margin:0}
+.center{text-align:center}
+#signup-form{display:grid;gap:12px;margin-top:18px}
+#signup-form label{display:grid;gap:4px;font-size:13px;color:var(--ink-2)}
+#signup-form.hidden{display:none}
+
+/* Accueil guidé */
+.onboard{position:fixed;inset:0;z-index:60;background:rgba(27,36,48,.45);display:grid;place-items:center;padding:16px}
+.onboard-card{background:var(--card);border-radius:14px;box-shadow:0 30px 80px -30px rgba(0,0,0,.5);width:min(520px,100%);padding:26px 28px}
+.steps{display:flex;gap:6px;margin-bottom:18px}
+.steps span{flex:1;font-size:12px;font-weight:600;color:var(--muted);border-top:3px solid var(--line);padding-top:6px}
+.steps span.on{color:var(--accent);border-top-color:var(--accent)}
+.ob-title{font-family:var(--serif);font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin-bottom:10px}
+.ob-step p{margin:0 0 10px}
+.ob-list{margin:0 0 14px;padding-left:20px;color:var(--ink-2);font-size:14px}
+.ob-list li{margin:4px 0}
+#ob-form{display:grid;gap:12px}
+#ob-form label{display:grid;gap:4px;font-size:13px;color:var(--ink-2)}
+.ob-check{display:grid;gap:3px;font-size:13px;color:var(--muted)}
+.ob-check .ok{color:#2f8a4a;font-weight:600}
+.ob-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+
+/* Admin */
+.admin-tab{margin-left:auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow)}
+.stat b{display:block;font:600 26px var(--mono)}
+.stat span{font-size:12.5px;color:var(--muted)}
+.stat.warn b{color:var(--warn)} .stat.bad b{color:var(--danger)}
+.admin-lock form{margin-top:8px}
+#admin-log tr.ev-login_failed td{background:var(--danger-bg)}
+#admin-log tr.ev-signup td{background:var(--warn-bg)}
+
 .print-only{display:none}
 @media (max-width:640px){
   .patient h1{font-size:24px}
