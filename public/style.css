@@ -247,6 +247,16 @@ dialog::backdrop{background:rgba(27,36,48,.35)}
 #admin-log tr.ev-login_failed td{background:var(--danger-bg)}
 #admin-log tr.ev-signup td{background:var(--warn-bg)}
 
+/* Page d'accès */
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--paper);border-radius:9px;padding:4px;margin-top:16px}
+.auth-tabs button{font:600 13.5px var(--sans);border:0;background:none;border-radius:7px;padding:8px;cursor:pointer;color:var(--ink-2)}
+.auth-tabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.how{margin:0;padding-left:20px;font-size:13px;color:var(--ink-2)}
+.how li{margin:2px 0}
+.sent{text-align:center;margin-top:18px}
+.sent-ico{font-size:34px;color:var(--accent)}
+.sent p{margin:6px 0}
+.sent .btn{margin-top:8px}
 .print-only{display:none}
 @media (max-width:640px){
   .patient h1{font-size:24px}

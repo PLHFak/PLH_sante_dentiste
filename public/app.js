@@ -71,38 +71,58 @@ async function boot() {
   sb.auth.onAuthStateChange((ev, sess) => {
     if (ev === "SIGNED_IN" && sess && !S.email) { if (location.hash.includes("access_token")) logEvent("magic_link", sess.user.email); enter(sess); }
     if (ev === "SIGNED_OUT") location.reload();
+    if (ev === "PASSWORD_RECOVERY") setTimeout(() => $("#pass-btn").click(), 600);
   });
 }
+
+/* Onglets de la page d'accès */
+function authPane(name) {
+  $$("#login [data-pane]").forEach((el) => el.classList.toggle("hidden", el.dataset.pane !== name));
+  $$("#login .auth-tabs button").forEach((t) => t.classList.toggle("on", t.dataset.auth === name));
+  $("#login .auth-tabs").classList.toggle("hidden", name === "sent");
+  const f = $(`#login [data-pane="${name}"] input`); if (f) setTimeout(() => f.focus(), 50);
+}
+$$("#login [data-auth]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); authPane(el.dataset.auth); }));
 
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("#login-email").value.trim(), password = $("#login-pass").value;
-  if (!password) { $("#login-msg").textContent = "Entrez le mot de passe, ou demandez un lien par e-mail."; return; }
   $("#login-msg").textContent = "Connexion…";
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
     logEvent("login_failed", email, error.message);
-    $("#login-msg").textContent = /invalid/i.test(error.message) ? "E-mail ou mot de passe incorrect." : "Échec : " + error.message;
+    if (/not confirmed/i.test(error.message)) {
+      $("#sent-to").textContent = email; authPane("sent");
+      $("#sent-msg").textContent = "Votre e-mail n'est pas encore confirmé. Cliquez le lien reçu, ou renvoyez-le ci-dessous.";
+    } else $("#login-msg").textContent = /invalid/i.test(error.message) ? "E-mail ou mot de passe incorrect. Pas encore de compte ? Cliquez « Créer mon accès »." : "Échec : " + error.message;
   } else logEvent("login", email);
 });
-$("#magic-btn").addEventListener("click", async () => {
+$("#forgot").addEventListener("click", async (e) => {
+  e.preventDefault();
   const email = $("#login-email").value.trim();
-  if (!email) { $("#login-msg").textContent = "Entrez votre e-mail d'abord."; return; }
-  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin, shouldCreateUser: false } });
-  $("#login-msg").textContent = error ? "Échec : " + error.message : "Lien envoyé. Ouvrez-le sur cet appareil.";
+  if (!email) { $("#login-msg").textContent = "Entrez d'abord votre e-mail ci-dessus, puis cliquez « Mot de passe oublié ? »."; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+  $("#login-msg").textContent = error ? "Échec : " + error.message : "Un e-mail de réinitialisation a été envoyé à " + email + ".";
 });
-$("#show-signup").addEventListener("click", (e) => { e.preventDefault(); $("#login-form").classList.add("hidden"); $("#signup-form").classList.remove("hidden"); });
-$("#show-login").addEventListener("click", (e) => { e.preventDefault(); $("#signup-form").classList.add("hidden"); $("#login-form").classList.remove("hidden"); });
 $("#signup-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("#su-email").value.trim(), p1 = $("#su-pass").value, p2 = $("#su-pass2").value;
   if (p1 !== p2) { $("#su-msg").textContent = "Les deux mots de passe diffèrent."; return; }
   $("#su-msg").textContent = "Envoi…";
-  const { error } = await sb.auth.signUp({ email, password: p1, options: { emailRedirectTo: location.origin, data: { password_set: true } } });
+  const { data, error } = await sb.auth.signUp({ email, password: p1, options: { emailRedirectTo: location.origin, data: { password_set: true } } });
   if (error) { $("#su-msg").textContent = "Échec : " + error.message; return; }
+  if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    $("#su-msg").textContent = "Un compte existe déjà avec cet e-mail : utilisez « Se connecter » (ou « Mot de passe oublié ? »)."; return;
+  }
   logEvent("signup", email);
-  await sb.auth.signOut({ scope: "local" });
-  $("#su-msg").textContent = "Demande enregistrée. Vous pourrez vous connecter dès que votre accès sera validé.";
+  $("#su-msg").textContent = "";
+  if (data?.session) return; // confirmation désactivée : entrée directe
+  $("#sent-to").textContent = email; $("#sent-msg").textContent = ""; authPane("sent");
+});
+$("#resend").addEventListener("click", async () => {
+  const email = $("#sent-to").textContent;
+  const { error } = await sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: location.origin } });
+  $("#sent-msg").textContent = error ? "Échec : " + error.message : "E-mail renvoyé.";
 });
 $("#logout-btn").addEventListener("click", async () => { logEvent("logout"); store("adm", null); await sb.auth.signOut(); });
 $("#pass-btn").addEventListener("click", () => {
@@ -122,7 +142,9 @@ async function enter(session) {
   const { data: me } = await sb.from("allowed_users").select("role").maybeSingle();
   if (!me) {
     $("#login").classList.remove("hidden");
-    $("#login-msg").textContent = `Votre compte ${S.email} est créé mais pas encore autorisé. Pierre L'Hoest doit valider votre accès.`;
+    $("#login-msg").textContent = session.user.email_confirmed_at
+      ? `L'accès du compte ${S.email} a été suspendu. Contactez Pierre L'Hoest.`
+      : `Confirmez d'abord votre e-mail ${S.email} (lien reçu par mail).`;
     S.email = null;
     await sb.auth.signOut({ scope: "local" });
     return;
@@ -134,7 +156,9 @@ async function enter(session) {
   $("#app").classList.remove("hidden");
   await loadAll();
   subscribe();
-  if (!session.user.user_metadata?.password_set) showOnboarding();
+  const md = session.user.user_metadata || {};
+  if (!md.password_set) showOnboarding(1);
+  else if (!md.tour_done) showOnboarding(3);
   const h = location.hash.slice(1);
   if (h && $(`#tabs [data-tab="${h}"]`) && !$(`#tabs [data-tab="${h}"]`).classList.contains("hidden")) $(`#tabs [data-tab="${h}"]`).click();
 }
@@ -145,7 +169,14 @@ function obStep(n) {
   $$("#onboard .steps span").forEach((s) => s.classList.toggle("on", +s.dataset.s <= n));
   const f = $(`#onboard .ob-step[data-step="${n}"] input`); if (f) setTimeout(() => f.focus(), 50);
 }
-function showOnboarding() { eyes($("#onboard")); $("#onboard").classList.remove("hidden"); obStep(1); }
+function showOnboarding(n = 1) {
+  eyes($("#onboard")); $("#onboard").classList.remove("hidden");
+  const tourOnly = n === 3;
+  $("#onboard .steps").classList.toggle("hidden", tourOnly);
+  $("#ob3-title").textContent = tourOnly ? "Bienvenue dans le dossier dentaire" : "C'est fait ✓";
+  $("#ob3-intro").textContent = tourOnly ? "Votre e-mail est confirmé. Voici comment s'y retrouver :" : "Votre mot de passe est enregistré. À la prochaine connexion, utilisez-le avec votre e-mail.";
+  obStep(n);
+}
 $$("#onboard [data-go]").forEach((b) => b.addEventListener("click", () => obStep(+b.dataset.go)));
 function obCheck() {
   const p1 = $("#ob-p1").value, p2 = $("#ob-p2").value;
@@ -164,7 +195,7 @@ $("#ob-form").addEventListener("submit", async (e) => {
   $("#ob-msg").textContent = "";
   obStep(3);
 });
-$("#ob-done").addEventListener("click", () => $("#onboard").classList.add("hidden"));
+$("#ob-done").addEventListener("click", () => { $("#onboard").classList.add("hidden"); sb.auth.updateUser({ data: { tour_done: true } }); });
 
 /* ---------- Admin ---------- */
 const ADMIN_CODE = "PLH";

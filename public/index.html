@@ -18,25 +18,42 @@
   <div class="login-card">
     <div class="login-mark">⟡</div>
     <h1>Dossier dentaire</h1>
-    <p class="muted">Accès réservé. Connectez-vous avec votre adresse e-mail.</p>
-    <form id="login-form">
+    <p class="muted">Pierre L'Hoest · consultation en ligne</p>
+    <div class="auth-tabs" role="tablist">
+      <button type="button" class="on" data-auth="login">Se connecter</button>
+      <button type="button" data-auth="signup">Créer mon accès</button>
+    </div>
+
+    <form id="login-form" data-pane="login">
       <label>E-mail<input type="email" id="login-email" required autocomplete="username"></label>
-      <label>Mot de passe<input type="password" id="login-pass" autocomplete="current-password"></label>
-      <p class="hint">Première connexion ? Utilisez le mot de passe provisoire reçu : vous choisirez le vôtre juste après.</p>
+      <label>Mot de passe<input type="password" id="login-pass" required autocomplete="current-password"></label>
       <button class="btn primary" type="submit">Se connecter</button>
-      <button class="btn ghost" type="button" id="magic-btn">Recevoir un lien par e-mail</button>
       <p id="login-msg" class="msg"></p>
-      <p class="small muted center">Pas encore de compte ? <a href="#" id="show-signup">Demander un accès</a></p>
+      <p class="small muted center"><a href="#" id="forgot">Mot de passe oublié ?</a> · Première visite ? <a href="#" data-auth="signup">Créer mon accès</a></p>
     </form>
-    <form id="signup-form" class="hidden">
-      <p class="hint">Créez votre compte. Il sera actif dès que Pierre L'Hoest aura validé votre accès.</p>
+
+    <form id="signup-form" data-pane="signup" class="hidden">
+      <ol class="how">
+        <li>Indiquez votre e-mail et choisissez un mot de passe.</li>
+        <li>Ouvrez l'e-mail de confirmation et cliquez le lien.</li>
+        <li>Vous arrivez directement dans le dossier.</li>
+      </ol>
       <label>E-mail<input type="email" id="su-email" required autocomplete="username"></label>
       <label>Mot de passe (6 caractères min.)<input type="password" id="su-pass" minlength="6" required autocomplete="new-password"></label>
       <label>Confirmer le mot de passe<input type="password" id="su-pass2" minlength="6" required autocomplete="new-password"></label>
-      <button class="btn primary" type="submit">Envoyer ma demande</button>
+      <button class="btn primary" type="submit">Créer mon accès</button>
       <p id="su-msg" class="msg"></p>
-      <p class="small muted center"><a href="#" id="show-login">← Retour à la connexion</a></p>
     </form>
+
+    <div id="check-mail" data-pane="sent" class="hidden sent">
+      <div class="sent-ico">✉</div>
+      <h2 class="ob-title">Vérifiez votre boîte mail</h2>
+      <p>Un e-mail de confirmation a été envoyé à <b id="sent-to"></b>.</p>
+      <p class="muted small">Cliquez le lien qu'il contient : vous arriverez directement dans le dossier. Pensez à regarder dans les indésirables.</p>
+      <button type="button" class="btn ghost" id="resend">Renvoyer l'e-mail</button>
+      <p id="sent-msg" class="msg"></p>
+      <p class="small center"><a href="#" data-auth="login">← Retour à la connexion</a></p>
+    </div>
   </div>
 </section>
 
@@ -47,7 +64,7 @@
 
     <div class="ob-step" data-step="1">
       <h2 class="ob-title">Bienvenue dans votre dossier dentaire</h2>
-      <p>Vous êtes connecté avec un <b>mot de passe provisoire</b>. Première étape : choisir le vôtre. Cela prend 30 secondes.</p>
+      <p>Pour sécuriser votre accès, choisissez votre mot de passe. Cela prend 30 secondes.</p>
       <ul class="ob-list">
         <li>6 caractères minimum, par exemple 6 chiffres.</li>
         <li>Évitez votre date de naissance ou 123456.</li>
@@ -68,8 +85,8 @@
     </div>
 
     <div class="ob-step hidden" data-step="3">
-      <h2 class="ob-title">C'est fait ✓</h2>
-      <p>Votre mot de passe est enregistré. À la prochaine connexion, utilisez-le avec votre e-mail.</p>
+      <h2 class="ob-title" id="ob3-title">C'est fait ✓</h2>
+      <p id="ob3-intro">Votre mot de passe est enregistré. À la prochaine connexion, utilisez-le avec votre e-mail.</p>
       <ul class="ob-list">
         <li><b>Synthèse</b> : alertes, prochain rendez-vous, questions ouvertes.</li>
         <li><b>Dents</b> : cliquez une dent pour voir sa fiche, ses radios et son historique.</li>
@@ -229,7 +246,7 @@
         <div class="card">
           <div class="card-head"><h2>Comptes et inscriptions</h2><button class="btn ghost small" id="admin-refresh">Actualiser</button></div>
           <div class="table-wrap"><table class="tbl" id="admin-users"></table></div>
-          <p class="muted small">« Aucun accès » : le compte existe mais ne voit rien. « Lecteur » : consultation seule. « Propriétaire » : peut tout modifier.</p>
+          <p class="muted small">Tout compte dont l’e-mail est confirmé devient « Lecteur » automatiquement (consultation seule). « Aucun accès » : compte bloqué. « Propriétaire » : peut tout modifier.</p>
         </div>
         <div class="card">
           <div class="card-head"><h2>Journal des visites et connexions</h2>
