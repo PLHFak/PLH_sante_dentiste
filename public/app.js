@@ -44,6 +44,8 @@ function logEvent(event, email = null, detail = null) {
 }
 function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { return null; } }
 
+const pw = (p) => (p.length < 6 ? p + "::plh-dossier" : p);
+
 /* ---------- Œil sur les mots de passe ---------- */
 function eyes(root = document) {
   $$('input[type="password"]', root).forEach((inp) => {
@@ -67,7 +69,7 @@ async function boot() {
   if (!SUPABASE_URL || !SUPABASE_KEY) { $("#login").classList.remove("hidden"); $("#login-msg").textContent = "Configuration Supabase manquante (config.js)."; return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!store("visited")) { store("visited", "1"); logEvent("visit", session?.user?.email, location.pathname + location.hash); }
-  if (session) await enter(session); else $("#login").classList.remove("hidden");
+  if (session) await enter(session); else { $("#login").classList.remove("hidden"); authPane("choose"); }
   sb.auth.onAuthStateChange((ev, sess) => {
     if (ev === "SIGNED_IN" && sess && !S.email) { if (location.hash.includes("access_token")) logEvent("magic_link", sess.user.email); enter(sess); }
     if (ev === "SIGNED_OUT") location.reload();
@@ -78,8 +80,6 @@ async function boot() {
 /* Onglets de la page d'accès */
 function authPane(name) {
   $$("#login [data-pane]").forEach((el) => el.classList.toggle("hidden", el.dataset.pane !== name));
-  $$("#login .auth-tabs button").forEach((t) => t.classList.toggle("on", t.dataset.auth === name));
-  $("#login .auth-tabs").classList.toggle("hidden", name === "sent");
   const f = $(`#login [data-pane="${name}"] input`); if (f) setTimeout(() => f.focus(), 50);
 }
 $$("#login [data-auth]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); authPane(el.dataset.auth); }));
@@ -88,7 +88,7 @@ $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("#login-email").value.trim(), password = $("#login-pass").value;
   $("#login-msg").textContent = "Connexion…";
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  const { error } = await sb.auth.signInWithPassword({ email, password: pw(password) });
   if (error) {
     logEvent("login_failed", email, error.message);
     if (/not confirmed/i.test(error.message)) {
@@ -109,7 +109,7 @@ $("#signup-form").addEventListener("submit", async (e) => {
   const email = $("#su-email").value.trim(), p1 = $("#su-pass").value, p2 = $("#su-pass2").value;
   if (p1 !== p2) { $("#su-msg").textContent = "Les deux mots de passe diffèrent."; return; }
   $("#su-msg").textContent = "Envoi…";
-  const { data, error } = await sb.auth.signUp({ email, password: p1, options: { emailRedirectTo: location.origin, data: { password_set: true } } });
+  const { data, error } = await sb.auth.signUp({ email, password: p1, options: { emailRedirectTo: location.origin, data: { password_set: true, display_name: $("#su-name").value.trim() || null } } });
   if (error) { $("#su-msg").textContent = "Échec : " + error.message; return; }
   if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
     $("#su-msg").textContent = "Un compte existe déjà avec cet e-mail : utilisez « Se connecter » (ou « Mot de passe oublié ? »)."; return;
@@ -131,7 +131,7 @@ $("#pass-btn").addEventListener("click", () => {
     <label>Confirmer<input type="password" name="p2" minlength="6" required autocomplete="new-password"></label>`,
     async (f) => {
       if (f.p1.value !== f.p2.value) { toast("Les deux saisies diffèrent"); return false; }
-      const { error } = await sb.auth.updateUser({ password: f.p1.value, data: { password_set: true } });
+      const { error } = await sb.auth.updateUser({ password: pw(f.p1.value), data: { password_set: true } });
       if (!error) logEvent("password_set");
       toast(error ? "Erreur : " + error.message : "Mot de passe modifié");
     });
@@ -139,9 +139,10 @@ $("#pass-btn").addEventListener("click", () => {
 
 async function enter(session) {
   S.email = session.user.email;
+  S.displayName = session.user.user_metadata?.display_name || null;
   const { data: me } = await sb.from("allowed_users").select("role").maybeSingle();
   if (!me) {
-    $("#login").classList.remove("hidden");
+    $("#login").classList.remove("hidden"); authPane("login");
     $("#login-msg").textContent = session.user.email_confirmed_at
       ? `L'accès du compte ${S.email} a été suspendu. Contactez Pierre L'Hoest.`
       : `Confirmez d'abord votre e-mail ${S.email} (lien reçu par mail).`;
@@ -173,8 +174,14 @@ function showOnboarding(n = 1) {
   eyes($("#onboard")); $("#onboard").classList.remove("hidden");
   const tourOnly = n === 3;
   $("#onboard .steps").classList.toggle("hidden", tourOnly);
-  $("#ob3-title").textContent = tourOnly ? "Bienvenue dans le dossier dentaire" : "C'est fait ✓";
-  $("#ob3-intro").textContent = tourOnly ? "Votre e-mail est confirmé. Voici comment s'y retrouver :" : "Votre mot de passe est enregistré. À la prochaine connexion, utilisez-le avec votre e-mail.";
+  const name = S.displayName ? " " + S.displayName : "";
+  $("#ob3-title").textContent = tourOnly ? `Bonjour${name}, bienvenue dans le dossier de Pierre.` : "C'est fait ✓ Bienvenue dans le dossier de Pierre.";
+  $("#ob3-intro").textContent = tourOnly ? "En bref :" : "Votre mot de passe est enregistré. En bref :";
+  const alerts = S.teeth.filter((t) => t.category === "Alerte").map((t) => t.fdi);
+  const next = [...S.events].filter((e) => e.date_sort && e.date_sort >= today).sort((a, b) => a.date_sort.localeCompare(b.date_sort))[0];
+  const al = $("#ob3-alert");
+  al.classList.toggle("hidden", !alerts.length && !next);
+  al.innerHTML = `🔴 <b>À savoir tout de suite</b> : ${alerts.length ? `dent${alerts.length > 1 ? "s" : ""} en alerte ${alerts.join(" et ")}` : ""}${next ? `${alerts.length ? " · " : ""}prochain rendez-vous ${esc(fmtDate(next.date_label))} (${esc(next.practitioner)})` : ""}.`;
   obStep(n);
 }
 $$("#onboard [data-go]").forEach((b) => b.addEventListener("click", () => obStep(+b.dataset.go)));
@@ -189,7 +196,7 @@ $("#ob-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!obCheck()) { $("#ob-msg").textContent = "Vérifiez les deux points ci-dessus."; return; }
   $("#ob-msg").textContent = "Enregistrement…";
-  const { error } = await sb.auth.updateUser({ password: $("#ob-p1").value, data: { password_set: true } });
+  const { error } = await sb.auth.updateUser({ password: pw($("#ob-p1").value), data: { password_set: true } });
   if (error) { $("#ob-msg").textContent = "Erreur : " + error.message; return; }
   logEvent("password_set");
   $("#ob-msg").textContent = "";
@@ -221,7 +228,7 @@ $("#admin-filter").addEventListener("change", renderAdmin);
 async function loadAdmin() {
   if (!adminUnlocked()) return;
   const [u, l] = await Promise.all([
-    sb.rpc("admin_users"),
+    sb.rpc("admin_people"),
     sb.from("access_log").select("*").order("at", { ascending: false }).limit(500),
   ]);
   if (u.error) toast("Admin : " + u.error.message);
@@ -240,7 +247,7 @@ function renderAdmin() {
   $("#admin-users").innerHTML = `<thead><tr><th>E-mail</th><th>Inscrit le</th><th>Dernière connexion</th><th>Mot de passe</th><th>Accès</th></tr></thead><tbody>` +
     A.users.map((u) => {
       const self = u.email?.toLowerCase() === S.email?.toLowerCase();
-      return `<tr><td>${esc(u.email)}${u.confirmed ? "" : ' <span class="badge b-Obturée">non confirmé</span>'}</td><td>${dt(u.created_at)}</td><td>${dt(u.last_sign_in_at)}</td><td>${u.password_set ? "choisi" : '<span class="muted">provisoire</span>'}</td>
+      return `<tr><td>${u.display_name ? `<b>${esc(u.display_name)}</b><br>` : ""}${esc(u.email)}${u.confirmed ? "" : ' <span class="badge b-Obturée">non confirmé</span>'}</td><td>${dt(u.created_at)}</td><td>${dt(u.last_sign_in_at)}</td><td>${u.password_set ? "choisi" : '<span class="muted">provisoire</span>'}</td>
       <td>${self ? '<span class="badge b-Implant">Propriétaire (vous)</span>' : `<select data-acc="${esc(u.email)}"><option value="" ${!u.role ? "selected" : ""}>Aucun accès</option><option value="reader" ${u.role === "reader" ? "selected" : ""}>Lecteur</option><option value="owner" ${u.role === "owner" ? "selected" : ""}>Propriétaire</option></select>`}</td></tr>`;
     }).join("") + "</tbody>";
   $$("[data-acc]").forEach((s) => s.addEventListener("change", async () => {

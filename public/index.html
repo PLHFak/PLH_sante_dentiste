@@ -17,42 +17,52 @@
 <section id="login" class="login hidden">
   <div class="login-card">
     <div class="login-mark">⟡</div>
-    <h1>Dossier dentaire</h1>
-    <p class="muted">Pierre L'Hoest · consultation en ligne</p>
-    <div class="auth-tabs" role="tablist">
-      <button type="button" class="on" data-auth="login">Se connecter</button>
-      <button type="button" data-auth="signup">Créer mon accès</button>
+
+    <!-- Accueil -->
+    <div data-pane="choose" class="welcome">
+      <h1>Bonjour 👋</h1>
+      <p>Vous êtes sur le <b>dossier dentaire de Pierre L'Hoest</b>.</p>
+      <p class="muted">Historique dentaire, radios, devis et questions en cours, mis à jour en temps réel.</p>
+      <p class="ask">Que souhaitez-vous faire ?</p>
+      <button type="button" class="choice" data-auth="signup"><b>C'est ma première visite</b><span>Je crée mon accès en 1 minute</span><i>→</i></button>
+      <button type="button" class="choice" data-auth="login"><b>J'ai déjà un accès</b><span>Je me connecte</span><i>→</i></button>
+      <p class="small muted center">Accès en consultation uniquement. Votre e-mail sert seulement à vous identifier.</p>
     </div>
 
-    <form id="login-form" data-pane="login">
-      <label>E-mail<input type="email" id="login-email" required autocomplete="username"></label>
-      <label>Mot de passe<input type="password" id="login-pass" required autocomplete="current-password"></label>
-      <button class="btn primary" type="submit">Se connecter</button>
-      <p id="login-msg" class="msg"></p>
-      <p class="small muted center"><a href="#" id="forgot">Mot de passe oublié ?</a> · Première visite ? <a href="#" data-auth="signup">Créer mon accès</a></p>
-    </form>
-
+    <!-- Première visite -->
     <form id="signup-form" data-pane="signup" class="hidden">
-      <ol class="how">
-        <li>Indiquez votre e-mail et choisissez un mot de passe.</li>
-        <li>Ouvrez l'e-mail de confirmation et cliquez le lien.</li>
-        <li>Vous arrivez directement dans le dossier.</li>
-      </ol>
-      <label>E-mail<input type="email" id="su-email" required autocomplete="username"></label>
-      <label>Mot de passe (6 caractères min.)<input type="password" id="su-pass" minlength="6" required autocomplete="new-password"></label>
-      <label>Confirmer le mot de passe<input type="password" id="su-pass2" minlength="6" required autocomplete="new-password"></label>
+      <h1>Bienvenue !</h1>
+      <p class="muted">Créons votre accès en trois étapes : ① votre e-mail, ② un mot de passe de votre choix, ③ un clic dans l'e-mail de confirmation.</p>
+      <label>Votre nom et qualité <span class="muted">(facultatif, ex. « Dr Martin, dentiste »)</span><input id="su-name" maxlength="80" autocomplete="name"></label>
+      <label>Votre e-mail<input type="email" id="su-email" required autocomplete="username"></label>
+      <label>Votre mot de passe (6 caractères min.)<input type="password" id="su-pass" minlength="6" required autocomplete="new-password"></label>
+      <label>Retapez-le<input type="password" id="su-pass2" minlength="6" required autocomplete="new-password"></label>
       <button class="btn primary" type="submit">Créer mon accès</button>
       <p id="su-msg" class="msg"></p>
+      <p class="small center"><a href="#" data-auth="choose">← Retour</a></p>
     </form>
 
+    <!-- Déjà un accès -->
+    <form id="login-form" data-pane="login" class="hidden">
+      <h1>Content de vous revoir.</h1>
+      <label>Votre e-mail<input type="email" id="login-email" required autocomplete="username"></label>
+      <label>Votre mot de passe<input type="password" id="login-pass" required autocomplete="current-password"></label>
+      <button class="btn primary" type="submit">Entrer dans le dossier</button>
+      <p id="login-msg" class="msg"></p>
+      <p class="small muted center"><a href="#" id="forgot">Mot de passe oublié ?</a> · Première visite ? <a href="#" data-auth="signup">Créer mon accès</a></p>
+      <p class="small center"><a href="#" data-auth="choose">← Retour</a></p>
+    </form>
+
+    <!-- E-mail envoyé -->
     <div id="check-mail" data-pane="sent" class="hidden sent">
       <div class="sent-ico">✉</div>
-      <h2 class="ob-title">Vérifiez votre boîte mail</h2>
-      <p>Un e-mail de confirmation a été envoyé à <b id="sent-to"></b>.</p>
-      <p class="muted small">Cliquez le lien qu'il contient : vous arriverez directement dans le dossier. Pensez à regarder dans les indésirables.</p>
+      <h1>Plus qu'une étape</h1>
+      <p>Nous venons d'envoyer un e-mail à <b id="sent-to"></b>.</p>
+      <p>Ouvrez-le et cliquez <b>« Confirmer mon adresse »</b> : vous arriverez directement dans le dossier.</p>
+      <p class="muted small">Rien reçu après 2 minutes ? Regardez dans les indésirables, ou renvoyez l'e-mail.</p>
       <button type="button" class="btn ghost" id="resend">Renvoyer l'e-mail</button>
       <p id="sent-msg" class="msg"></p>
-      <p class="small center"><a href="#" data-auth="login">← Retour à la connexion</a></p>
+      <p class="small center"><a href="#" data-auth="login">← J'ai confirmé, je me connecte</a></p>
     </div>
   </div>
 </section>
@@ -85,15 +95,16 @@
     </div>
 
     <div class="ob-step hidden" data-step="3">
-      <h2 class="ob-title" id="ob3-title">C'est fait ✓</h2>
-      <p id="ob3-intro">Votre mot de passe est enregistré. À la prochaine connexion, utilisez-le avec votre e-mail.</p>
+      <h2 class="ob-title" id="ob3-title">Bonjour, bienvenue dans le dossier de Pierre.</h2>
+      <p id="ob3-intro">En bref :</p>
+      <div id="ob3-alert" class="ob-alert hidden"></div>
       <ul class="ob-list">
-        <li><b>Synthèse</b> : alertes, prochain rendez-vous, questions ouvertes.</li>
-        <li><b>Dents</b> : cliquez une dent pour voir sa fiche, ses radios et son historique.</li>
-        <li><b>Radios &amp; documents</b> : visionneuse avec zoom et contraste ; glissez-y de nouveaux fichiers.</li>
-        <li><b>Résumé dentiste</b> : une page imprimable à montrer en consultation.</li>
+        <li>🦷 <b>Dents</b> : cliquez une dent pour sa fiche, ses radios et son historique.</li>
+        <li>🩻 <b>Radios</b> : zoom, contraste et inversion des couleurs.</li>
+        <li>📅 <b>Chronologie</b> : tous les soins, rendez-vous et devis depuis 2020.</li>
+        <li>❓ <b>À clarifier</b> : les questions sur lesquelles votre avis est le bienvenu.</li>
       </ul>
-      <div class="ob-actions"><button class="btn primary" id="ob-done">Ouvrir mon dossier</button></div>
+      <div class="ob-actions"><button class="btn primary" id="ob-done">Ouvrir le dossier</button></div>
     </div>
   </div>
 </section>
