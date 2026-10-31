@@ -161,7 +161,7 @@ async function enter(session) {
     return;
   }
   S.role = me.role;
-  S.noPrices = !!me.no_prices && me.role !== "owner";
+  S.noPrices = me.role !== "owner";
   document.body.classList.toggle("reader", !isOwner());
   $("#admin-tab").classList.toggle("hidden", !isOwner());
   $("#login").classList.add("hidden");
