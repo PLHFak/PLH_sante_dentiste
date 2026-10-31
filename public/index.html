@@ -26,6 +26,7 @@
       <p class="ask">Que souhaitez-vous faire ?</p>
       <button type="button" class="choice" data-auth="signup"><b>C'est ma première visite</b><span>Je crée mon accès en 1 minute</span><i>→</i></button>
       <button type="button" class="choice" data-auth="login"><b>J'ai déjà un accès</b><span>Je me connecte</span><i>→</i></button>
+      <button type="button" class="choice" data-auth="code"><b>J'ai reçu un code d'accès</b><span>Praticien invité</span><i>→</i></button>
       <p class="small muted center">Accès en consultation uniquement. Votre e-mail sert seulement à vous identifier.</p>
     </div>
 
@@ -50,6 +51,16 @@
       <button class="btn primary" type="submit">Entrer dans le dossier</button>
       <p id="login-msg" class="msg"></p>
       <p class="small muted center"><a href="#" id="forgot">Mot de passe oublié ?</a> · Première visite ? <a href="#" data-auth="signup">Créer mon accès</a></p>
+      <p class="small center"><a href="#" data-auth="choose">← Retour</a></p>
+    </form>
+
+    <!-- Code d'accès invité -->
+    <form id="code-form" data-pane="code" class="hidden">
+      <h1>Accès praticien</h1>
+      <p class="muted">Saisissez le code d'accès qui vous a été transmis par Pierre L'Hoest.</p>
+      <label>Code d'accès<input type="password" id="code-in" required autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <button class="btn primary" type="submit">Entrer dans le dossier</button>
+      <p id="code-msg" class="msg"></p>
       <p class="small center"><a href="#" data-auth="choose">← Retour</a></p>
     </form>
 

@@ -97,6 +97,16 @@ $("#login-form").addEventListener("submit", async (e) => {
     } else $("#login-msg").textContent = /invalid/i.test(error.message) ? "E-mail ou mot de passe incorrect. Pas encore de compte ? Cliquez « Créer mon accès »." : "Échec : " + error.message;
   } else logEvent("login", email);
 });
+$("#code-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const code = $("#code-in").value.trim().toUpperCase().replace(/\s+/g, "");
+  if (!code) return;
+  const email = `${code.toLowerCase()}@invites.plh-sante-dentiste.vercel.app`;
+  $("#code-msg").textContent = "Vérification…";
+  const { error } = await sb.auth.signInWithPassword({ email, password: code });
+  if (error) { logEvent("login_failed", "code invité", error.message); $("#code-msg").textContent = "Code non reconnu. Vérifiez la saisie (majuscules et chiffres)."; }
+  else logEvent("login", email, "code invité");
+});
 $("#forgot").addEventListener("click", async (e) => {
   e.preventDefault();
   const email = $("#login-email").value.trim();
@@ -140,7 +150,7 @@ $("#pass-btn").addEventListener("click", () => {
 async function enter(session) {
   S.email = session.user.email;
   S.displayName = session.user.user_metadata?.display_name || null;
-  const { data: me } = await sb.from("allowed_users").select("role").maybeSingle();
+  const { data: me } = await sb.from("allowed_users").select("role,no_prices").maybeSingle();
   if (!me) {
     $("#login").classList.remove("hidden"); authPane("login");
     $("#login-msg").textContent = session.user.email_confirmed_at
@@ -151,6 +161,7 @@ async function enter(session) {
     return;
   }
   S.role = me.role;
+  S.noPrices = !!me.no_prices && me.role !== "owner";
   document.body.classList.toggle("reader", !isOwner());
   $("#admin-tab").classList.toggle("hidden", !isOwner());
   $("#login").classList.add("hidden");
@@ -266,11 +277,19 @@ function device(ua = "") {
 }
 
 /* ---------- Données ---------- */
+/* Masquage des montants pour les invités « sans prix » */
+const MONEY = /(\d[\d\s\u202f\u00a0.]*(?:,\d{1,2})?\s?(?:€|EUR|euros?)|(?:€|EUR)\s?\d[\d\s.,]*)/gi;
+function maskPrices(row) {
+  const r = { ...row };
+  if ("amount" in r) r.amount = null;
+  for (const k of Object.keys(r)) if (typeof r[k] === "string") r[k] = r[k].replace(MONEY, "[montant masqué]");
+  return r;
+}
 async function load(table) {
   const order = { teeth: "fdi", events: "date_sort", documents: "doc_date", questions: "num", notes: "created_at" }[table];
   const { data, error } = await sb.from(table).select("*").order(order, { ascending: table !== "notes", nullsFirst: false });
   if (error) { toast("Erreur de chargement : " + error.message); return; }
-  S[table] = data;
+  S[table] = S.noPrices ? data.map(maskPrices) : data;
 }
 async function loadAll() {
   await Promise.all(["teeth", "events", "documents", "questions", "notes"].map(load));
@@ -437,7 +456,7 @@ function renderChrono() {
     (!tf || parseTeeth(e.teeth).has(tf)) &&
     (!q || [e.description, e.practitioner, e.source, e.status, e.teeth].join(" ").toLowerCase().includes(q)));
   const total = list.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  $("#chrono-total").textContent = `${list.length} événements · total des montants connus : ${euro(total)}`;
+  $("#chrono-total").textContent = S.noPrices ? `${list.length} événements` : `${list.length} événements · total des montants connus : ${euro(total)}`;
   $("#timeline").innerHTML = list.map((e) => eventHTML(e)).join("") || `<div class="empty">Aucun événement.</div>`;
   bindTimeline($("#timeline"));
 }
