@@ -67,6 +67,15 @@ function eyes(root = document) {
 async function boot() {
   eyes();
   if (!SUPABASE_URL || !SUPABASE_KEY) { $("#login").classList.remove("hidden"); $("#login-msg").textContent = "Configuration Supabase manquante (config.js)."; return; }
+  // Accès direct par lien : https://…/?code=XXXX (code invité encodé dans l'URL)
+  const urlCode = new URLSearchParams(location.search).get("code");
+  if (urlCode) {
+    const code = urlCode.trim().toUpperCase().replace(/\s+/g, "");
+    history.replaceState(null, "", location.pathname + location.hash);
+    const email = `${code.toLowerCase()}@invites.plh-sante-dentiste.vercel.app`;
+    const { error } = await sb.auth.signInWithPassword({ email, password: code });
+    logEvent(error ? "login_failed" : "login", error ? "lien invité" : email, error ? error.message : "lien direct");
+  }
   const { data: { session } } = await sb.auth.getSession();
   if (!store("visited")) { store("visited", "1"); logEvent("visit", session?.user?.email, location.pathname + location.hash); }
   if (session) await enter(session); else { $("#login").classList.remove("hidden"); authPane("choose"); }
